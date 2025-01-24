@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>Калькулятор энергопотребления</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      padding: 0;
+      color: #333;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    form, .buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      max-width: 600px;
+      margin: 0 auto 20px auto;
+      align-items: flex-end;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 4px;
+      font-weight: bold;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-width: 180px;
+    }
+
+    input[type="number"], input[type="text"] {
+      padding: 6px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+
+    button {
+      padding: 8px 12px;
+      cursor: pointer;
+      border: none;
+      border-radius: 4px;
+      background-color: #4285f4;
+      color: #fff;
+      font-size: 14px;
+    }
+
+    button:hover {
+      background-color: #3071e8;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 20px;
+      overflow-x: auto;
+    }
+
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px 10px;
+      text-align: center;
+    }
+
+    th {
+      background-color: #f9f9f9;
+    }
+
+    /* Адаптивность для мобильных устройств */
+    @media (max-width: 600px) {
+      form, .buttons {
+        flex-direction: column;
+      }
+
+      .form-group {
+        min-width: auto;
+        width: 100%;
+      }
+
+      table {
+        font-size: 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<h1>Калькулятор энергопотребления</h1>
+
+<!-- Форма для ввода данных одного прибора -->
+<form id="deviceForm">
+  <div class="form-group">
+    <label for="deviceName">Название прибора</label>
+    <input type="text" id="deviceName" name="deviceName" placeholder="Например, Чайник" />
+  </div>
+  
+  <div class="form-group">
+    <label for="usageHours">Время использования в день (ч)</label>
+    <input type="number" id="usageHours" name="usageHours" step="any" placeholder="Например, 2" />
+  </div>
+  
+  <div class="form-group">
+    <label for="power">Мощность (Вт)</label>
+    <input type="number" id="power" name="power" step="any" placeholder="Например, 2000" />
+  </div>
+  
+  <div class="form-group">
+    <label for="costPerKwh">Цена за кВт·ч (руб)</label>
+    <input type="number" id="costPerKwh" name="costPerKwh" step="any" placeholder="Например, 5.5" />
+  </div>
+</form>
+
+<!-- Кнопки управления -->
+<div class="buttons">
+  <button type="button" id="addDeviceBtn">Добавить прибор</button>
+  <button type="button" id="calculateBtn">Рассчитать</button>
+  <button type="button" id="resetBtn">Сбросить</button>
+</div>
+
+<!-- Контейнер для динамически создаваемой таблицы -->
+<div id="tableContainer"></div>
+
+<script>
+  // Массив для хранения данных всех приборов
+  let devices = [];
+
+  // Ссылки на элементы
+  const deviceNameInput = document.getElementById("deviceName");
+  const usageHoursInput = document.getElementById("usageHours");
+  const powerInput = document.getElementById("power");
+  const costPerKwhInput = document.getElementById("costPerKwh");
+
+  const addDeviceBtn = document.getElementById("addDeviceBtn");
+  const calculateBtn = document.getElementById("calculateBtn");
+  const resetBtn = document.getElementById("resetBtn");
+  const tableContainer = document.getElementById("tableContainer");
+
+  // Функция безопасного парсинга числа (при NaN возвращается 0)
+  function parseNumber(value) {
+    const num = parseFloat(value);
+    return isNaN(num) ? 0 : num;
+  }
+
+  // Функция добавления текущего содержимого формы в список приборов
+  function addDeviceFromForm() {
+    const name = deviceNameInput.value.trim() || "Без имени";
+    const hours = parseNumber(usageHoursInput.value);
+    const power = parseNumber(powerInput.value);
+    const cost = parseNumber(costPerKwhInput.value);
+
+// Добавляем объект с данными в массив
+    devices.push({ 
+      name: name, 
+      hours: hours, 
+      power: power, 
+      cost: cost 
+    });
+
+    // Очищаем поля формы для следующего ввода
+    deviceNameInput.value = "";
+    usageHoursInput.value = "";
+    powerInput.value = "";
+    costPerKwhInput.value = "";
+  }
+
+  // Обработчик нажатия на "Добавить прибор"
+  addDeviceBtn.addEventListener("click", () => {
+    addDeviceFromForm();
+  });
+
+  // Функция расчёта и построения таблицы
+  function calculateAndRenderTable() {
+    // Если пользователь ничего не добавлял через "Добавить прибор",
+    // но ввёл данные в поля, нужно учесть эти данные как первый прибор
+    const formHasData = (
+      deviceNameInput.value.trim() !== "" ||
+      usageHoursInput.value !== "" ||
+      powerInput.value !== "" ||
+      costPerKwhInput.value !== ""
+    );
+
+    if (formHasData) {
+      // Добавим прибор из формы в список
+      addDeviceFromForm();
+    }
+
+    // Если нет ни одного прибора, выводим сообщение
+    if (devices.length === 0) {
+      tableContainer.innerHTML = "<p>Нет данных для расчёта. Пожалуйста, введите данные прибора.</p>";
+      return;
+    }
+
+    // Строим таблицу
+    // Структура строк (период):
+    // 1) 1 час
+    // 2) 1 день
+    // 3) 1 месяц
+    // 4) 1 год
+    // 5) Пользовательское число часов(а)
+    // 6) Числовое значение (отображаем введённые часы)
+
+    // Создадим элемент таблицы
+    const table = document.createElement("table");
+
+    // ----------------- Шапка (thead) ----------------- 
+    const thead = document.createElement("thead");
+    const headerRow = document.createElement("tr");
+    
+    // Первая ячейка шапки (слово "Период")
+    const periodTh = document.createElement("th");
+    periodTh.textContent = "Период";
+    headerRow.appendChild(periodTh);
+
+    // Для каждого прибора - два столбца: потребление, цена
+    devices.forEach(device => {
+      const consumptionTh = document.createElement("th");
+      consumptionTh.textContent = Потребление (кВт·ч) ${device.name};
+      headerRow.appendChild(consumptionTh);
+
+      const costTh = document.createElement("th");
+      costTh.textContent = Цена (РУБ) ${device.name};
+      headerRow.appendChild(costTh);
+    });
+
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    // ----------------- Тело таблицы (tbody) -----------------
+    const tbody = document.createElement("tbody");
+
+    // Подготовим набор строк
+    const periods = [
+      "1 час",
+      "1 день",
+      "1 месяц",
+      "1 год",
+      "Пользовательское число часов(а)",
+      "Всего введено часов"
+    ];
+
+    // Для удобства рассчёта коэффициента умножения
+    // rowIndex: 0 1 2 3 4 5
+    // описание: 1ч 1день 1месяц 1год Польз.часы (отображаем часы)
+    // multiply: 1 -> H -> H*30.44 -> H*365.25 -> H -> (для 6-й нет потребл./цены)
+    // где H = usageHours для конкретного прибора
+    // Note: для "1 день" используем user.hours (H)
+
+    // Создаём по одной строке на каждый период
+    periods.forEach((periodText, rowIndex) => {
+      const row = document.createElement("tr");
+
+      // Первая ячейка - название периода
+      const periodTd = document.createElement("td");
+      periodTd.textContent = periodText;
+      row.appendChild(periodTd);
+
+      // Для каждого прибора вычисляем потребление и цену
+      devices.forEach(device => {
+        const hours = device.hours; // H
+        const power = device.power; // Вт
+        const cost = device.cost; // руб/кВт·ч
+
+        // Функция рассчёта потребления (кВт·ч)
+        function getConsumption(kwhPower, hoursUsed) {
+          // kwhPower = (Вт / 1000)
+          // consumption = kwhPower * hoursUsed
+          const result = (kwhPower * hoursUsed);
+          return isNaN(result) ? 0 : result;
+        }
+
+        // Для каждого rowIndex определим, сколько часов использовать
+        let usedHours = 0;
+
+switch (rowIndex) {
+          case 0: // "1 час"
+            usedHours = 1;
+            break;
+          case 1: // "1 день"
+            usedHours = hours;
+            break;
+          case 2: // "1 месяц" (30.44 дней)
+            usedHours = hours * 30.44;
+            break;
+          case 3: // "1 год" (365.25 дней)
+            usedHours = hours * 365.25;
+            break;
+          case 4: // "Пользовательское число часов(а)"
+            usedHours = hours;
+            break;
+          case 5: 
+            // "Всего введено часов" - здесь мы не считаем потребление/цену, 
+            // поэтому оставим 0 и выведем отдельную логику ниже
+            usedHours = 0;
+            break;
+        }
+
+        const kwhPower = power / 1000; // мощность в кВт
+        const consumption = getConsumption(kwhPower, usedHours);
+        const totalCost = consumption * cost;
+
+        // Для последней строки (rowIndex = 5) отобразим только часы,
+        // а ячейки потребления и цены сделаем пустыми или 0
+        if (rowIndex !== 5) {
+          // Создаём ячейки для потребления и цены
+          const consumptionTd = document.createElement("td");
+          consumptionTd.textContent = consumption.toFixed(4); // округлим для удобства
+
+          const costTd = document.createElement("td");
+          costTd.textContent = totalCost.toFixed(2);
+
+          // Проверка на NaN (если что-то не так введено)
+          if (isNaN(consumption)) consumptionTd.textContent = "0";
+          if (isNaN(totalCost)) costTd.textContent = "0";
+
+          row.appendChild(consumptionTd);
+          row.appendChild(costTd);
+        } else {
+          // rowIndex = 5: "Всего введено часов"
+          // Выведем в потребление ячейку просто пустую
+          const consumptionTd = document.createElement("td");
+          consumptionTd.textContent = "";
+          row.appendChild(consumptionTd);
+
+          // А в цену - само значение часов (как пример)
+          const costTd = document.createElement("td");
+          costTd.textContent = hours; 
+          if (isNaN(hours)) costTd.textContent = "0"; 
+          row.appendChild(costTd);
+        }
+      });
+
+      tbody.appendChild(row);
+    });
+
+    table.appendChild(tbody);
+    tableContainer.innerHTML = ""; // очищаем предыдущую таблицу
+    tableContainer.appendChild(table);
+  }
+
+  // Обработчик кнопки "Рассчитать"
+  calculateBtn.addEventListener("click", calculateAndRenderTable);
+
+  // Обработчик кнопки "Сбросить"
+  resetBtn.addEventListener("click", () => {
+    // Очищаем массив устройств
+    devices = [];
+    // Очищаем поля формы
+    deviceNameInput.value = "";
+    usageHoursInput.value = "";
+    powerInput.value = "";
+    costPerKwhInput.value = "";
+    // Очищаем контейнер с таблицей
+    tableContainer.innerHTML = "";
+  });
+</script>
+
+</body>
+</html>
